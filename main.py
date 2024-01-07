@@ -14,31 +14,52 @@ from PIL import Image
 (X_train, y_train), (X_test, y_test) = cifar10.load_data()
 
 # HOG feature extraction
-X_train_hog = np.array([])
+X_train_hog = []
+X_test_hog = []
+
+X_train_combined = []
+X_test_combined = []
+
+
 for idx, img in enumerate(X_train):
-    img_hog = np.array([])
+    img_hog = []
     for channel_num in range(img.shape[2]):
         _, hog_channel = hog(img[:, :, channel_num], pixels_per_cell=(8, 8), cells_per_block=(2, 2),
                              block_norm='L2-Hys', visualize=True)
         hog_channel = exposure.rescale_intensity(hog_channel, in_range=(0, 10))
-        img_hog = np.append(img_hog, hog_channel, axis=0)
-    print(idx)
-    print()
+        img_hog.append(hog_channel)
+    img_hog = np.dstack((np.array(img_hog[0]), np.array(img_hog[1]), np.array(img_hog[2])))
+    X_train_hog.append(img_hog)
+    img_combined = np.concatenate((img[None, :, :, :], img_hog[None, :, :, :]))
+    X_train_combined.append(img_combined)
+    print(img.shape)
+    print(img_hog.shape)
+    print(img_combined.shape)
+
+print('Train dataset is Done!')
+
 
 for idx, img in enumerate(X_test):
+    img_hog = []
     for channel_num in range(img.shape[2]):
         _, hog_channel = hog(img[:, :, channel_num], pixels_per_cell=(8, 8), cells_per_block=(2, 2),
                              block_norm='L2-Hys', visualize=True)
         hog_channel = exposure.rescale_intensity(hog_channel, in_range=(0, 10))
-        img[:, :, channel_num] = hog_channel
-    print(idx)
+        img_hog.append(hog_channel)
+    img_hog = np.dstack((np.array(img_hog[0]), np.array(img_hog[1]), np.array(img_hog[2])))
+    X_test_hog.append(img_hog)
+    img_combined = np.concatenate((img[None, :, :, :], img_hog[None, :, :, :]))
+    X_test_combined.append(img_combined)
+
+print('Test dataset is Done!')
+
 
 print('HOG feature extraction Done!..')
 
 # Building Model
 model = Sequential()
 
-model.add(Conv2D(64, input_shape=(32, 32, 3), kernel_size=(3, 3), padding='same', activation='relu'))
+model.add(Conv2D(64, input_shape=(2, 32, 32, 3), kernel_size=(3, 3), padding='same', activation='relu'))
 model.add(MaxPool2D(pool_size=(2, 2)))
 
 model.add(Conv2D(64, kernel_size=(3, 3), padding='same', activation='relu'))
@@ -59,14 +80,14 @@ print('Model built!..')
 
 # Train model
 history = model.fit(
-    X_train,
+    X_train_combined,
     y_train,
     validation_split=0.1,
     epochs=30,
 )
 
 # Evaluate model
-print(model.evaluate(X_test, y_test))
+print(model.evaluate(X_test_combined, y_test))
 
 # Plot the results
 plt.subplot(1, 2, 1)
